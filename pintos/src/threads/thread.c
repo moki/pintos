@@ -1,4 +1,5 @@
 #include "threads/thread.h"
+#include "devices/timer.h"
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
@@ -27,6 +28,9 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+/* List of processes in the THREAD_SLEEPING state */
+static struct list sleeping_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -92,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleeping_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -133,6 +138,26 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  enum intr_level old_level = intr_disable ();
+  int64_t tick_now = timer_ticks();
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  struct list_elem *cursor;
+  for (cursor = list_begin (&sleeping_list);
+       cursor != list_end (&sleeping_list);
+       cursor = list_next(cursor)
+  ) {
+    struct thread *thread = list_entry (cursor, struct thread, sleepelem);
+    if (tick_now >= thread->wakeup_time) {
+      thread->wakeup_time = 0;
+      list_remove(&thread->sleepelem);
+      list_push_back (&ready_list, &thread->elem);
+      thread->status = THREAD_READY;
+    }
+  }
+
+  intr_set_level (old_level);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -240,6 +265,22 @@ thread_unblock (struct thread *t)
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+/* thread_sleep */
+void thread_sleep(int64_t ticks) {
+  struct thread *current = thread_current();
+  enum intr_level old_level;
+
+  old_level = intr_disable();
+  if (current != idle_thread) {
+    list_push_back(&sleeping_list, &current->sleepelem);
+    current->status = THREAD_SLEEPING;
+    current->wakeup_time = timer_ticks() + ticks;
+    schedule();
+  }
+
+  intr_set_level(old_level);
 }
 
 /* Returns the name of the running thread. */

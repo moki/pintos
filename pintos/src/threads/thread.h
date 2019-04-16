@@ -13,7 +13,8 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-    THREAD_DYING        /* About to be destroyed. */
+    THREAD_DYING,       /* About to be destroyed. */
+    THREAD_SLEEPING	/* asleep */
   };
 
 /* Thread identifier type.
@@ -92,8 +93,14 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    /* list element for sleeping_list */
+    struct list_elem sleepelem;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    /* Time to wake thread up, if sleeping */
+    int64_t wakeup_time;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -120,6 +127,8 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+
+void thread_sleep(int64_t ticks);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
