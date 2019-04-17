@@ -91,6 +91,7 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int original_priority;
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* list element for sleeping_list */
@@ -101,6 +102,9 @@ struct thread
 
     /* Time to wake thread up, if sleeping */
     int64_t wakeup_time;
+
+    struct lock *waiting_lock;
+    struct list locks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -143,10 +147,15 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_priority_donate(struct thread *target, int priority);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+bool cmp_prio(const struct list_elem *a,
+              const struct list_elem *b,
+              void *aux);
 
 #endif /* threads/thread.h */
