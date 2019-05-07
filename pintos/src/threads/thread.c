@@ -219,6 +219,8 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  t->parent_id = thread_current()->tid;
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -557,6 +559,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->original_priority = priority;
   t->waiting_lock = NULL;
   list_init(&(t->locks));
+
+#ifdef USERPROG
+  t->child_load_status = 0;
+  lock_init(&t->lock_child);
+  cond_init(&t->cond_child);
+  list_init(&t->children);
+#endif
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -689,4 +699,18 @@ bool cmp_prio (const struct list_elem *a,
   ASSERT(threadb != NULL);
 
   return threada->priority > threadb->priority;
+}
+
+struct thread *thread_get_by_id(tid_t id) {
+	ASSERT(id != TID_ERROR);
+	struct list_elem *e;
+	struct thread *t = NULL;
+
+	for (e = list_tail(&all_list); (e = list_prev(e)) != list_head(&all_list);) {
+		t = list_entry(e, struct thread, allelem);
+		if (t->tid == id && t->status != THREAD_DYING)
+			return t;
+	}
+
+	return NULL;
 }

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -21,6 +22,22 @@ enum thread_status
    You can redefine this to whatever type you like. */
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+
+struct child_status {
+  tid_t child_id;
+  bool is_exit_called;
+  bool has_been_waited;
+  int child_exit_status;
+  struct list_elem elem_child_status;
+};
+
+struct waiting_child {
+  tid_t child_id;
+  int child_exit_status;
+  bool is_terminated_by_kernel;
+  bool has_been_waited;
+  struct list_elem elem_waiting_child;
+};
 
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
@@ -106,10 +123,19 @@ struct thread
     struct lock *waiting_lock;
     struct list locks;
 
-#ifdef USERPROG
+//#ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-#endif
+    tid_t parent_id;
+
+    int child_load_status;
+
+    struct lock lock_child;
+    struct condition cond_child;
+
+    struct list children;
+    struct file *exec_file;
+//#endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -153,6 +179,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+struct thread *thread_get_by_id(tid_t);
 
 bool cmp_prio(const struct list_elem *a,
               const struct list_elem *b,

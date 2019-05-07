@@ -4,10 +4,12 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
+static void exit(int);
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 
@@ -148,6 +150,9 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  if (!is_valid_ptr(fault_addr))
+    exit(-1);
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -159,3 +164,25 @@ page_fault (struct intr_frame *f)
   kill (f);
 }
 
+static void exit(int status) {
+	struct child_status *child;
+	struct thread *current = thread_current();
+	printf ("%s: exit(%d)\n", current->name, status);
+	struct thread *parent = thread_get_by_id(current->parent_id);
+
+	if (!parent)
+		thread_exit();
+
+	struct list_elem *e;
+	for (e = list_tail(&parent->children);(e = list_prev(e)) != list_head(&parent->children);) {
+		child = list_entry(e, struct child_status, elem_child_status);
+		if (child->child_id == current->tid) {
+			lock_acquire(&parent->lock_child);
+			child->is_exit_called = true;
+			child->child_exit_status = status;
+			lock_release(&parent->lock_child);
+		}
+	}
+
+	thread_exit();
+}
