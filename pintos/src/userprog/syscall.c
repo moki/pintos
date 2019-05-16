@@ -22,6 +22,7 @@ struct file_descriptor {
 struct list open_files;
 struct lock fs_lock;
 
+static int practice(int);
 static void halt(void);
 static pid_t exec(const char*);
 static int wait(pid_t);
@@ -40,7 +41,6 @@ static void close_open_file(int);
 void close_file_by_owner(tid_t);
 static void syscall_handler (struct intr_frame *);
 static int allocate_fd(void);
-bool is_valid_ptr(const void *);
 
 void
 syscall_init (void)
@@ -67,6 +67,9 @@ static void syscall_handler (struct intr_frame *f) {
 	}
 
 	switch (*args) {
+		case SYS_PRACTICE:
+			f->eax = practice(*(args+1));
+			break;
 		case SYS_EXIT:
 			exit(*(args+1));
 			break;
@@ -109,6 +112,10 @@ static void syscall_handler (struct intr_frame *f) {
 		default:
 			break;
 	}
+}
+
+int practice(int val) {
+	return val + 1;
 }
 
 void halt(void) {
